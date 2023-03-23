@@ -1,0 +1,31 @@
+\documentclass[12pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{amsmath}
+\usepackage{physics}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{setspace} \doublespacing
+\graphicspath{{Images/}}
+
+
+\title{PHYS 471 Midterm Report: Autocatalytic Reaction Networks}
+\author{Varun Varanasi}
+\begin{document}
+
+
+\maketitle
+
+My PHYS 471 project is done under the advisement of  Prof. Jun Korenaga in the Geophysics department. Together, we are studying autocatalytic reaction networks in the context of the origin of life. Our scientific understanding of the development of life is well understood in two parts. First, through the theory of evolution, we understand the broad mechanics under which modern life developed from a single cellular organism. On the other side, through experiments such as the famous Miller-Urey experiment, we understand how biological molecules can arise from abiotic systems. The large question mark in our understanding of the origin of life lies between these two. How did the first unicellular organisms develop from biological molecules? \\
+
+Our best understanding of this phenomenon is through self-replicating systems. In particular, we hypothesize that rudimentary biological systems developed from self-replicating chemical processes. The foremost theory in this field is the belief that this occurs through autocatalytic reaction networks. As opposed to traditional reaction networks (a set of chemical reactions and constituents), these reaction networks are able to self-catalyze and self-replicate. We refer to such a set of reactions and chemicals as an autocatalytic set. The theoretical underpinnings of this idea was originally discovered in 1971 and since then, researchers have focused on detecting such sets and understanding their dynamics and limitations. \\
+
+My research focuses on this subset of autocatalytic reaction problems. Given that current research is done with highly idealized systems built on unrealistic assumptions, my advisor’s broad interest with this project has been to relax the assumptions underlying such claims to develop more realistic models. At this point in the semester, my work has been largely focused on developing a conceptual background for the material and beginning to replicate key papers in the field. In terms of conceptual background, the first few weeks of my semester were spent conducting a literature review of autocatalytic reaction network papers and understanding the relevant background. \\
+
+Afterwards, Prof. Korenaga recommended that I begin replicating the results of a paper titled “Detecting Autocatalytic Self-sustaining sets in chemical reaction systems”. In this paper, the authors  introduced a novel algorithm known as RAF that is able to detect autocatalytic sets from a provided reaction network. At a high level, the algorithm functions through a series of steps that effectively select the “barebones” of the autocatalytic set from a much larger network of reactions. Thus far, my work has been primarily focused on understanding the intricacies of this model and replicating them. I have written a script that takes in a generalized reaction network and produces RAF subsets obeying the rules outlined in the paper. \\
+
+Throughout this process, I have also made careful note of model imperfections and potential areas of improvement. Once my script is finalized, the preceding weeks of the semester will be focused on testing these model imperfections and adding increasing complexity to the model. In particular, I am interested in exploring the network structure of RAF subsets, adding additional complexities (more realistic conditions), and understanding the temporal dynamics of autocatalytic reaction networks.
+
+\end{document}
