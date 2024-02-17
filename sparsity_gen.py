@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import itertools
@@ -196,7 +195,7 @@ def RAF(X,F,R,C):
     else:
         return 1
 
-def add_catalyst(X, R, C):
+def add_catalyst(F, R, C):
     add_new = 0
     while add_new == 0:
         reaction = random.sample(list(R.keys()),1)[0]
@@ -204,7 +203,7 @@ def add_catalyst(X, R, C):
             k = 1
         else:
             k = -1
-        catalyst = random.sample(X,1)[0]
+        catalyst = random.sample(F,1)[0]
         
         if reaction in C:
             if catalyst not in C[reaction]:
@@ -218,73 +217,87 @@ def add_catalyst(X, R, C):
             add_new = 1
     return(C)
 
-def remove_catalyst(C):
-    reaction = random.sample(list(C), 1)[0]
-    if reaction %2 == 1:
-        k = 1
-    else:
-        k = -1
+def remove_catalyst(C, F):
+    #print(np.unique([num for sublist in list(C.values()) for num in sublist]))
+    food_catalysts = list(set(np.unique([num for sublist in list(C.values()) for num in sublist])) & set(F))
+    #print("FC: {}".format(food_catalysts))
+    if len(food_catalysts) > 0:
+        catalyst = random.sample(food_catalysts, 1)[0]
+
+        for i in list(C.keys()):
+            
+            if catalyst in C[i]:
+                if i %2 == 1:
+                    k = 1
+                else:
+                    k = -1
+
+                if len(C[i]) > 1:
+                    C[i].remove(catalyst)
+                    C[i+k].remove(catalyst)
+                else:
+                    del C[i]
+                    del C[i+k]
+                
+                break
+ 
+    return C
+
+
+def get_M (X,R,C,X_dict):
+
+    M1 = np.zeros(len(X) * len(R))
+    M1= M1.reshape((len(X), len(R)))
     
-    if len(C[reaction]) == 1:
-        del C[reaction]
-        del C[reaction+ k]
-  
-    else:
-      
-        catalyst = random.sample(C[reaction], 1)[0]
-        
-        C[reaction].remove(catalyst)
-        
-        C[reaction+k].remove(catalyst)
-       
-    return(C)
+    for reaction in C:
+        for c in C[reaction]:
+            i = X_dict[c]
+            j = reaction -1
+            M1[i,j] = 1
 
+    return M1
 
-def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
-    RAFs = 0
+def sparse_gen (N, f, n, t=2):
+    success = []
+    failure = []
 
     if n == 2:
         t = 1
 
-
     for j in range(N):
         X,F,R = create_XFR(n, t)
+        X_dict = {}
+        for i in range(len(X)):
+            X_dict[X[i]] = i
         p = f/len(R)
         C = create_catalysts(X, len(R),p)
-        
-
+    
         raf = RAF(X.copy(), F.copy(), R.copy(), C)
-        RAFs += raf
         if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
+            success.append( get_M(X, R,C, X_dict))
         else:
-           
-            #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
-
-
-    print("{} Trials of n = {} at f = {}".format(N, n, f))
-    print("----------------------")
-    print("Percentage RAF: {}".format(RAFs/N))
-    if RAFs != 0:
-        print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
+            failure.append( get_M(X, R,C, X_dict))
+    
+    success_name = 'Data/Matrix-{}-{}-RAF'.format(n,f)
+    if not os.path.exists(success_name):
+        np.save(success_name, success)
     else:
-        print("No RAFs")
-    if N-RAFs != 0:
-        print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
+        with open(success_name, 'wb') as f:
+            np.save(f, success)
+
+    failure_name = 'Data/Matrix-{}-{}-Non-RAF'.format(n,f)
+    if not os.path.exists(failure_name):
+        np.save(failure_name, failure)
     else:
-        print("All RAFs")
-    print("")
+        with open(failure_name, 'wb') as f:
+            np.save(f, failure)
+    
+
+    #np.save('Data/Matrix-{}-{}-Non-RAF'.format(n,f), failure)
+    #pd.DataFrame(list(success)).to_csv('Data/Matrix-{}-{}-RAF.csv'.format(n,f), mode='a', index=False,header=False)
+    #pd.DataFrame(list(failure)).to_csv('Data/Matrix-{}-{}-Non-RAF.csv'.format(n,f), mode='a', index=False,header=False)
 
     return
-
 
 
 Ns = ast.literal_eval(sys.argv[1])
@@ -302,8 +315,8 @@ if __name__ == '__main__':
         for i in range(len(Ns)):
             vals = vals + [(Ns[i],fs[i],ns[i])]
             
-        p.starmap(stability_test, vals)
-            
-    
+        p.starmap(sparse_gen, vals)
 
-        
+
+
+

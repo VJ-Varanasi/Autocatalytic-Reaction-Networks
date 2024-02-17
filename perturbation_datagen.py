@@ -240,10 +240,10 @@ def remove_catalyst(C):
     return(C)
 
 
-def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
+def stability_test_count (N, f, n, t=2):
     RAFs = 0
+    success_counts = []
+    failure_counts = []
 
     if n == 2:
         t = 1
@@ -257,40 +257,55 @@ def stability_test (N, f, n, t=2):
 
         raf = RAF(X.copy(), F.copy(), R.copy(), C)
         RAFs += raf
-        if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
+        if raf ==1:
+            count = 0
+            while raf == 1:
+                #print("C:{}".format(C))
+                
+                new_C = remove_catalyst(C)
+                #print("New C:{}".format(new_C))
+                if new_C:
+                    raf = RAF(X.copy(),F.copy(),R.copy(),new_C)
+                    count += 1
+                    C = new_C.copy()
+                    #success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C
+                else:
+                    count += 1
+                    break
+            success_counts.append(count)
         else:
-           
+            count = 0
+            while raf != 1:
+                #print("C:{}".format(C))
+                new_C = add_catalyst(X.copy(),R.copy(), C)
+                #print("New C:{}".format(new_C))
+        
+                raf = RAF(X.copy(),F.copy(),R.copy(),new_C)
+                C = new_C.copy()
+                count += 1
+                    #success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
+            failure_counts.append(count)
             #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
+            #new_C = add_catalyst(X.copy(),R.copy(), C)
+            #failure_stability += RAF(X,F,R,new_C)
 
+    pd.DataFrame(success_counts).to_csv('Data/{}_{}-RAF_Perturbations.csv'.format(n, f), mode='a', index=False)
+    pd.DataFrame(failure_counts).to_csv('Data/{}_{}-Non-RAF_Perturbations.csv'.format(n, f), mode='a', index=False)
 
-    print("{} Trials of n = {} at f = {}".format(N, n, f))
-    print("----------------------")
-    print("Percentage RAF: {}".format(RAFs/N))
-    if RAFs != 0:
-        print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
-    else:
-        print("No RAFs")
-    if N-RAFs != 0:
-        print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
-    else:
-        print("All RAFs")
-    print("")
 
     return
 
 
 
-Ns = ast.literal_eval(sys.argv[1])
-ns = ast.literal_eval(sys.argv[2])
-fs = ast.literal_eval(sys.argv[3])
+N = ast.literal_eval(sys.argv[1])
+n_range = ast.literal_eval(sys.argv[2])
+f_range = ast.literal_eval(sys.argv[3])
 
+fs = np.linspace(f_range[0], f_range[1], f_range[2])
+ns = np.arange(n_range[0], n_range[1]+1, 1)
+
+points = list(itertools.product(fs, ns))
+#print(points)
 
 
 pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
@@ -299,11 +314,8 @@ if __name__ == '__main__':
     with pool as p:
         vals = []
         
-        for i in range(len(Ns)):
-            vals = vals + [(Ns[i],fs[i],ns[i])]
+        for point in points:
+            vals = vals + [(N,point[0],point[1])]
             
-        p.starmap(stability_test, vals)
+        p.starmap(stability_test_count, vals)
             
-    
-
-        

@@ -241,13 +241,9 @@ def remove_catalyst(C):
 
 
 def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
+    succ_counts = []
+    fail_counts = []
     RAFs = 0
-
-    if n == 2:
-        t = 1
-
 
     for j in range(N):
         X,F,R = create_XFR(n, t)
@@ -257,33 +253,38 @@ def stability_test (N, f, n, t=2):
 
         raf = RAF(X.copy(), F.copy(), R.copy(), C)
         RAFs += raf
+        count = 0
         if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
+            while raf ==1:
+                if C:
+                    new_C = remove_catalyst(C)
+              
+                if new_C:
+                    raf = RAF(X.copy(),F.copy(),R.copy(),new_C)
+                    C = new_C
+                count += 1
+            
+            succ_counts.append(count)
         else:
-           
-            #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
-
+            while raf ==0:
+                new_C = add_catalyst(X.copy(),R.copy(), C)
+                raf = RAF(X.copy(),F.copy(),R.copy(),new_C)
+                C= new_C
+                count += 1
+            fail_counts.append(count)
+        
 
     print("{} Trials of n = {} at f = {}".format(N, n, f))
     print("----------------------")
     print("Percentage RAF: {}".format(RAFs/N))
-    if RAFs != 0:
-        print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
-    else:
-        print("No RAFs")
-    if N-RAFs != 0:
-        print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
-    else:
-        print("All RAFs")
+    print("Average Perturbations to Disrupt RAF: {}".format(np.mean(succ_counts)))
+    print("Standard Deviation of Perturbations to Disrupt RAF: {}".format(np.std(succ_counts)))
+    print("Average Perturbations to Produce RAF: {}".format(np.mean(fail_counts)))
+    print("Standard Deviation of Perturbations to Produce RAF: {}".format(np.std(fail_counts)))
+
     print("")
 
-    return
+    return succ_counts, fail_counts
 
 
 
@@ -293,16 +294,31 @@ fs = ast.literal_eval(sys.argv[3])
 
 
 
-pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
+#pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
+pool = multiprocess.Pool(processes=4)
 
 if __name__ == '__main__':
     with pool as p:
+        fig, axs = plt.subplots(nrows=3, ncols=3, figsize= (5*3, 4*3))
         vals = []
+        success= []
+        failures = []
         
         for i in range(len(Ns)):
             vals = vals + [(Ns[i],fs[i],ns[i])]
             
-        p.starmap(stability_test, vals)
+        for result1 in p.starmap(stability_test, vals):
+            print(result1)
+            success.append(result1[0])
+            failures.append(result1[1])
+
+    print(success)
+    print(failures)
+
+
+
+
+
             
     
 

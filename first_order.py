@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 import itertools
@@ -12,8 +11,12 @@ import multiprocess
 import sys
 import os
 import ast
+from numpy import linalg 
+import glob
+
 
 def create_XFR(n, t = 2,k = 2):
+
     if n ==2:
         t = 1
 
@@ -113,6 +116,7 @@ def closure(F, R):
                         no_change = 0
     return(X)
 
+
 def Rsupp (R):
     supp = []
     for i in list(R.values()):
@@ -170,140 +174,191 @@ def reduceToF(F, R):
     
     return R
 
+
 def RAF(X,F,R,C):
-    X_old = X.copy()
-    R_old = copy.deepcopy(R)
+    X_prev = X.copy()
+    R_prev = copy.deepcopy(R)
+    C_prev = copy.deepcopy(C)
 
     i = 0 
     change = 0
     while change != 1:
-        R, C = reduceR(R, C)
-        X = closure(F,R)
-        R = reduceToF(F,R)
+        R_new, C_new = reduceR(copy.deepcopy(R_prev), copy.deepcopy(C_prev))
+        X_new = closure(F,R_new)
+        R_new = reduceToF(F,R_new)
         i= i+1
 
-        if R != False and X != False:
-            if X_old == X and R_old == R:
+        if R_new != False and X_new != False:
+            if X_prev == X_new and R_prev == R_new:
                 change = 1
             else:
-                R_old = copy.deepcopy(R)
-                X_old = X.copy()
+                R_prev = copy.deepcopy(R_new)
+                X_prev = X_new.copy()
+                C_prev= copy.deepcopy(C_new)
         else:
             break
     
     if not R:
-        return 0
+        return 0 #, X_new
+    
     else:
-        return 1
+        #print(X_old)
+        #print(R_old)
+        #graph(X_old, F, R_old,C_old)
+        return 1 #, X_new
 
-def add_catalyst(X, R, C):
-    add_new = 0
-    while add_new == 0:
-        reaction = random.sample(list(R.keys()),1)[0]
-        if reaction %2 == 1:
-            k = 1
-        else:
-            k = -1
-        catalyst = random.sample(X,1)[0]
-        
+
+
+
+# def test(N,f,n):
+#     raf_count = 0
+#     non_first = 0
+#     for i in range(N):
+#         X,F,R = create_XFR(n)
+#         first_order = {}
+#         for i in F:
+#             for j in F:
+#                 add = i + j
+#                 if add not in F:
+#                     if add not in first_order:
+#                         first_order[add] = 1
+#                     else:
+#                         first_order[add] +=1
+
+
+#         p = f/len(R)
+#         #print(p)
+#         C = create_catalysts(X, len(R),p)
+#         raf = RAF(X,F,R,C)
+#         if raf == 1:
+#             raf_count +=1
+#             gen = [i for i in X_old if i not in F]
+#             #print(gen)
+#             if len(gen) != 0:
+#                 first_order_gen = [j for j in gen if j in list(first_order.keys())]
+#                 if len(first_order_gen) == 0:
+#                     print(C)
+#                     #graph(X_old, F,R,C)
+#                     non_first +=1
+
+#     print(non_first)
+#     print(raf_count)
+#     print("--")
+#     return 
+
+
+
+def new_RAF (F,R,C):
+
+    first_order = {}
+    for i in F:
+        for j in F:
+            add = i + j
+            if add not in F:
+                if add not in first_order:
+                    first_order[add] = 1
+                else:
+                    first_order[add] +=1
+
+    react_list = []
+    for reaction in R:
+        if reaction % 2 == 1:
+            if R[reaction][1][0] in F:
+                react_list.append(reaction)
+                react_list.append(reaction +1)
+            elif R[reaction][1][0] in first_order.keys():
+                react_list.append(reaction)
+                react_list.append(reaction +1)
+
+    count = 0
+    
+    for reaction in react_list:
         if reaction in C:
-            if catalyst not in C[reaction]:
-                C[reaction].append(catalyst)
-                C[reaction + k].append(catalyst)
-                add_new = 1
-
-        else:
-            C[reaction] = [catalyst]
-            C[reaction+k] = [catalyst]
-            add_new = 1
-    return(C)
-
-def remove_catalyst(C):
-    reaction = random.sample(list(C), 1)[0]
-    if reaction %2 == 1:
-        k = 1
-    else:
-        k = -1
+            if len(list(set(C[reaction]) & set(F))) != 0:
+               #print(reaction)
+                count += len(list(set(C[reaction]) & set(F))) 
     
-    if len(C[reaction]) == 1:
-        del C[reaction]
-        del C[reaction+ k]
-  
-    else:
-      
-        catalyst = random.sample(C[reaction], 1)[0]
-        
-        C[reaction].remove(catalyst)
-        
-        C[reaction+k].remove(catalyst)
-       
-    return(C)
+    return count
+ 
 
 
-def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
-    RAFs = 0
+failure = glob.glob("Data/Dict-Matrix-*-Non-RAF.txt")
 
-    if n == 2:
-        t = 1
+df_data = []
 
+for file in failure:
+    #Cs = []
+    n = int(file.split("-")[2])
+    f = float(file.split("-")[3])
 
-    for j in range(N):
-        X,F,R = create_XFR(n, t)
-        p = f/len(R)
-        C = create_catalysts(X, len(R),p)
-        
+    file1 = open(file, 'r')
+    Lines = file1.readlines()
+    
+    Cs = [ast.literal_eval(line) for line in Lines]
 
-        raf = RAF(X.copy(), F.copy(), R.copy(), C)
-        RAFs += raf
-        if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
-        else:
-           
-            #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
+    X,F,R = create_XFR(n)
 
+    # if (n,f) not in failure_dict:
+    #     failure_dict[(n,f)] = [ast.literal_eval(line) for line in Lines] 
+    # else:
+    #     failure_dict[(n,f)].append([ast.literal_eval(line) for line in Lines])
 
-    print("{} Trials of n = {} at f = {}".format(N, n, f))
-    print("----------------------")
-    print("Percentage RAF: {}".format(RAFs/N))
-    if RAFs != 0:
-        print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
-    else:
-        print("No RAFs")
-    if N-RAFs != 0:
-        print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
-    else:
-        print("All RAFs")
-    print("")
+    count = 0
+    for c in Cs:
+        if new_RAF(F,R,c) != 0:
+            count += 1
 
-    return
+    df_data.append([n,f, count])  
+
+print("NON-RAF")
+non_raf = pd.DataFrame(df_data, columns = ["n", "f", "Non-First-Order Non-RAF"])
+print(non_raf)
 
 
-
-Ns = ast.literal_eval(sys.argv[1])
-ns = ast.literal_eval(sys.argv[2])
-fs = ast.literal_eval(sys.argv[3])
-
-
-
-pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
-
-if __name__ == '__main__':
-    with pool as p:
-        vals = []
-        
-        for i in range(len(Ns)):
-            vals = vals + [(Ns[i],fs[i],ns[i])]
-            
-        p.starmap(stability_test, vals)
-            
     
 
+success = glob.glob("Data/Dict-Matrix-*[0-9]-RAF.txt")
+
+df_data= []
+for file in success:
+    n = int(file.split("-")[2])
+    f = float(file.split("-")[3])
+
+    file1 = open(file, 'r')
+    Lines = file1.readlines()
+    
+    Cs = [ast.literal_eval(line) for line in Lines]
+
+    X,F,R = create_XFR(n)
+
+    # if (n,f) not in failure_dict:
+    #     failure_dict[(n,f)] = [ast.literal_eval(line) for line in Lines] 
+    # else:
+    #     failure_dict[(n,f)].append([ast.literal_eval(line) for line in Lines])
+
+    count = 0
+    for c in Cs:
+        if new_RAF(F,R,c) == 0:
+            count += 1
+
+    df_data.append([n,f, count])  
+
+print("RAF")
+raf = pd.DataFrame(df_data, columns = ["n", "f", "Non-First-Order RAF Set"])
+print(raf)
+
+# Ns = ast.literal_eval(sys.argv[1])
+# ns = ast.literal_eval(sys.argv[2])
+# fs = ast.literal_eval(sys.argv[3])
+
+
+# pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
+
+# if __name__ == '__main__':
+#     with pool as p:
+#         vals = []
         
+#         for i in range(len(Ns)):
+#             vals = vals + [(Ns[i],fs[i],ns[i])]
+            
+#         p.starmap(test, vals)

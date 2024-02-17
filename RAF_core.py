@@ -1,4 +1,6 @@
 
+
+
 import numpy as np
 import pandas as pd
 import itertools
@@ -12,6 +14,34 @@ import multiprocess
 import sys
 import os
 import ast
+import glob
+from numpy import linalg
+import json
+import pickle
+import ast
+
+#Convert data to matrix
+#Find raf core
+#convert core to matrix
+#find Fro distance
+
+def get_M (X,R,C):
+
+    M1 = np.zeros(len(X) * len(R))
+    M1= M1.reshape((len(X), len(R)))
+
+    X_dict = {}
+    for i in range(len(X)):
+        X_dict[X[i]] = i
+    
+    for reaction in C:
+        for c in C[reaction]:
+            i = X_dict[c]
+            j = int(reaction) -1
+            M1[i,j] = 1
+
+    return M1
+
 
 def create_XFR(n, t = 2,k = 2):
     if n ==2:
@@ -170,140 +200,105 @@ def reduceToF(F, R):
     
     return R
 
-def RAF(X,F,R,C):
-    X_old = X.copy()
-    R_old = copy.deepcopy(R)
+def RAF_C(X,F,R,C):
+    
+    
+
+    X_prev = copy.deepcopy(X)
+    R_prev = copy.deepcopy(R)
+    C_prev = copy.deepcopy(C)
 
     i = 0 
     change = 0
     while change != 1:
-        R, C = reduceR(R, C)
-        X = closure(F,R)
-        R = reduceToF(F,R)
+        R_prev, C_curr = reduceR(R_prev, C_prev)
+        X_curr = closure(F,R_prev)
+        R_curr = reduceToF(F,R_prev)
         i= i+1
 
-        if R != False and X != False:
-            if X_old == X and R_old == R:
+        if R_curr != False and X_curr != False:
+            if X_curr == X_prev and R_curr == R_prev:
                 change = 1
             else:
-                R_old = copy.deepcopy(R)
-                X_old = X.copy()
+                R_prev = copy.deepcopy(R_curr)
+                X_prev = copy.deepcopy(X_curr)
         else:
             break
     
-    if not R:
-        return 0
-    else:
-        return 1
+    return C_curr
 
-def add_catalyst(X, R, C):
-    add_new = 0
-    while add_new == 0:
-        reaction = random.sample(list(R.keys()),1)[0]
-        if reaction %2 == 1:
-            k = 1
-        else:
-            k = -1
-        catalyst = random.sample(X,1)[0]
+def norm_dist(C, n):
+
+    X,F,R = create_XFR(n)
+
+    mat_i = get_M(X,R,C)
+    core = RAF_C(X,F,R,C)
+    #print(core)
+    #print(X)
+    #print(R)
+    mat_core = get_M(X,R,core)
+
+    return linalg.norm(mat_i - mat_core , "nuc")
+   
+
+
+success = glob.glob("Data/Dict-Matrix-*[0-9]-RAF.txt")
+
+
+raf_nuc = []
+for file in success:
+    norms = []
+    n = int(file.split("-")[2])
+    f = float(file.split("-")[3])
+    #print(file)
+    #data = pd.to_numeric(pd.read_csv("{}".format(file)).iloc[:,0])
+    #print(file)
+    file1 = open(file, 'r')
+    Lines = file1.readlines()
+
+    for line in Lines:
+
         
-        if reaction in C:
-            if catalyst not in C[reaction]:
-                C[reaction].append(catalyst)
-                C[reaction + k].append(catalyst)
-                add_new = 1
+        #C = line[1:][:-2]
+        #print(line)
+        #print(type(line))
+        #print("--")
+        C= ast.literal_eval(line)
+        #print(C)
+        #print(type(C))
+        #print("")
+        norms.append(norm_dist(C,n))
+        
 
-        else:
-            C[reaction] = [catalyst]
-            C[reaction+k] = [catalyst]
-            add_new = 1
-    return(C)
 
-def remove_catalyst(C):
-    reaction = random.sample(list(C), 1)[0]
-    if reaction %2 == 1:
-        k = 1
-    else:
-        k = -1
+    #with open(file, "rb") as f_dict:
+        # s = "[" + f_dict.read() + "]"
+        # print(s)
+        # dict_list = ast.literal_eval(str(s))
+        #print(s)
+        #dict_list = ast.literal_eval(s)
+    #dict_list = json.load(yeet)
     
-    if len(C[reaction]) == 1:
-        del C[reaction]
-        del C[reaction+ k]
-  
-    else:
-      
-        catalyst = random.sample(C[reaction], 1)[0]
-        
-        C[reaction].remove(catalyst)
-        
-        C[reaction+k].remove(catalyst)
-       
-    return(C)
+    #print(dict_list)
 
-
-def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
-    RAFs = 0
-
-    if n == 2:
-        t = 1
-
-
-    for j in range(N):
-        X,F,R = create_XFR(n, t)
-        p = f/len(R)
-        C = create_catalysts(X, len(R),p)
-        
-
-        raf = RAF(X.copy(), F.copy(), R.copy(), C)
-        RAFs += raf
-        if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
-        else:
-           
-            #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
-
-
-    print("{} Trials of n = {} at f = {}".format(N, n, f))
-    print("----------------------")
-    print("Percentage RAF: {}".format(RAFs/N))
-    if RAFs != 0:
-        print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
-    else:
-        print("No RAFs")
-    if N-RAFs != 0:
-        print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
-    else:
-        print("All RAFs")
-    print("")
-
-    return
-
-
-
-Ns = ast.literal_eval(sys.argv[1])
-ns = ast.literal_eval(sys.argv[2])
-fs = ast.literal_eval(sys.argv[3])
-
-
-
-pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
-
-if __name__ == '__main__':
-    with pool as p:
-        vals = []
-        
-        for i in range(len(Ns)):
-            vals = vals + [(Ns[i],fs[i],ns[i])]
-            
-        p.starmap(stability_test, vals)
-            
+    #result = [ast.literal_eval('{%s}' % item[1:-1]) for item in dict_list]
+    #print(ast.literal_eval(dict_list))
+    # for C in yeet.columns:
+    #         #     norms.append(norm_dist(C,n))
     
 
-        
+
+
+    raf_nuc.append([n, f, len(norms), np.mean(norms), np.std(norms), np.min(norms), np.max(norms)])
+
+
+    #print(data)
+    # nuc, fro = norm_dist(mat)
+    # raf_nuc.append([n,f] + nuc)
+    # raf_fro.append([n,f] + fro)
+
+df_nuc= pd.DataFrame(raf_nuc, columns = ["n", "f", "N", "Mean", "Std", "Min", "Max"])
+df_nuc.to_csv('Data/RAF_core_nuc_norms.csv', index=False)
+
+# df_fro= pd.DataFrame(raf_fro, columns = ["n", "f", "N", "Mean", "Std", "Min", "Max"])
+# df_fro.to_csv('Data/RAF_fro_norms.csv')

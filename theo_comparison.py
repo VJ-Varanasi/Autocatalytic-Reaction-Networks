@@ -12,8 +12,82 @@ import multiprocess
 import sys
 import os
 import ast
+import glob
+import math
+
+
+
+def len_R (n, k = 2):
+    # Set of Molecules
+    X = []
+    alphabet = string.ascii_uppercase[0:k]
+    for i in range(1, n+1):    
+        vals = [''.join(m) for m in itertools.product(alphabet, repeat=i)]
+        X = X + vals
+        
+    #print(X)
+    #print(F)
+
+    # Reaction (pair of molecules)
+    R = {}
+    react_count = 1
+    for i in range(len(X)):
+        cand = X[i] + X[i]
+        if len(cand) <= n:
+            R[react_count] = [[X[i], X[i]], [cand]]
+            react_count +=1
+            #Lysis Reaction
+            R[react_count] = [[cand],[X[i], X[i]]]
+            react_count +=1
+
+        for j in range(i+1, len(X)):
+            cand1 = X[i] + X[j]
+            cand2 = X[j] + X[i]
+            if len(cand1) <= n:
+                if cand2 != cand1:
+                    #print(list(R.values()))
+                    if [[X[j], X[i]], [cand1]] not in list(R.values()):
+                        R[react_count] = [[X[i], X[j]], [cand1]]
+                        react_count +=1
+                    
+                    if [[cand1],[X[j], X[i]]] not in list(R.values()):
+                        R[react_count] = [[cand1],[X[i], X[j]]]
+                        react_count +=1
+                    
+                    if [[X[i], X[j]], [cand2]] not in list(R.values()):
+                        R[react_count] = [[X[j], X[i]], [cand2]]
+                        react_count +=1
+                    
+                    if [[cand2],[X[i], X[j]]] not in list(R.values()):
+                        R[react_count] = [[cand2],[X[j], X[i]]]
+                        react_count +=1
+                else:
+                    if [[X[j], X[i]], [cand1]] not in list(R.values()):
+                        R[react_count] = [[X[i], X[j]], [cand1]]
+                        react_count +=1
+                    
+
+                    if [[cand1],[X[j], X[i]]] not in list(R.values()):
+                        R[react_count] = [[cand1],[X[i], X[j]]]
+                        react_count +=1
+    return react_count -1
+
+len_r = {2: 8, 3:36, 4: 128, 5: 376, 6: 1004, 7:2528, 8 : 6096, 9:14260, 10:32668}
+counts = {2: 0.35, 3: 0.25, 4: 0.45, 5: 1.12, 6:1.3, 7:1.4, 8:1.4, 10:1.4}
+
+def get_files(string):
+    # all_files = glob.glob("Data/*{}}".format(string))
+    out_files = []
+    # sizes = np.unique([file.split("-")[0][5:].split("_")[0] for file in all_files])
+    for size in counts:
+        out_files.append("Data/{}_{}{}".format(size, counts[size], string))
+
+    
+    return out_files
+
 
 def create_XFR(n, t = 2,k = 2):
+
     if n ==2:
         t = 1
 
@@ -113,6 +187,7 @@ def closure(F, R):
                         no_change = 0
     return(X)
 
+
 def Rsupp (R):
     supp = []
     for i in list(R.values()):
@@ -170,6 +245,7 @@ def reduceToF(F, R):
     
     return R
 
+
 def RAF(X,F,R,C):
     X_old = X.copy()
     R_old = copy.deepcopy(R)
@@ -177,7 +253,7 @@ def RAF(X,F,R,C):
     i = 0 
     change = 0
     while change != 1:
-        R, C = reduceR(R, C)
+        R, C_old = reduceR(R, C)
         X = closure(F,R)
         R = reduceToF(F,R)
         i= i+1
@@ -194,93 +270,74 @@ def RAF(X,F,R,C):
     if not R:
         return 0
     else:
+        #print(X_old)
+        #print(R_old)
+        #graph(X_old, F, R_old,C_old)
         return 1
 
-def add_catalyst(X, R, C):
-    add_new = 0
-    while add_new == 0:
-        reaction = random.sample(list(R.keys()),1)[0]
-        if reaction %2 == 1:
-            k = 1
-        else:
-            k = -1
-        catalyst = random.sample(X,1)[0]
-        
-        if reaction in C:
-            if catalyst not in C[reaction]:
-                C[reaction].append(catalyst)
-                C[reaction + k].append(catalyst)
-                add_new = 1
 
-        else:
-            C[reaction] = [catalyst]
-            C[reaction+k] = [catalyst]
-            add_new = 1
-    return(C)
-
-def remove_catalyst(C):
-    reaction = random.sample(list(C), 1)[0]
-    if reaction %2 == 1:
-        k = 1
+def theo(f,n):
+    if n not in len_r:
+        Rn = len_R(n)
     else:
-        k = -1
+        Rn  = len_r[n]
     
-    if len(C[reaction]) == 1:
-        del C[reaction]
-        del C[reaction+ k]
-  
-    else:
-      
-        catalyst = random.sample(C[reaction], 1)[0]
-        
-        C[reaction].remove(catalyst)
-        
-        C[reaction+k].remove(catalyst)
-       
-    return(C)
+    return 1- (1 - f/Rn)**240
 
+def comp(N,f,n):
+    raf_count = 0
+    
+    for i in range(N):
+        X,F,R = create_XFR(n)
 
-def stability_test (N, f, n, t=2):
-    success_stability = 0
-    failure_stability = 0
-    RAFs = 0
-
-
-    for j in range(N):
-        X,F,R = create_XFR(n, t)
         p = f/len(R)
+        #print(p)
         C = create_catalysts(X, len(R),p)
-        
+        raf_count += RAF(X,F,R,C)
+    
+    return raf_count/N
 
-        raf = RAF(X.copy(), F.copy(), R.copy(), C)
-        RAFs += raf
-        if raf == 1:
-            #print("C:{}".format(C))
-            new_C = remove_catalyst(C)
-            #print("New C:{}".format(new_C))
-            if new_C:
-                success_stability += RAF(X.copy(),F.copy(),R.copy(),new_C)
-        else:
-           
-            #print("R:{}".format(R))
-            new_C = add_catalyst(X.copy(),R.copy(), C)
-            failure_stability += RAF(X,F,R,new_C)
 
-    print("{} Trials of n = {} at f = {}".format(N, n, f))
-    print("----------------------")
-    print("Percentage RAF: {}".format(RAFs/N))
-    print("Percentage RAF after Perturbation of Stable: {}".format(success_stability/RAFs))
-    print("Percentage RAF after Perturbation of Unstable: {}".format(failure_stability/(N-RAFs)))
-    print("")
 
-    return
+success = get_files("-RAF_Perturbations.csv")
 
+k = len(success)
+n = math.ceil(np.sqrt(k))
+fig, axs = plt.subplots(n,n, figsize =(10, 7), constrained_layout = True)
+fig.suptitle('Scaled RAF Perturbations', fontsize=16)
+fig.tight_layout()
+
+for ind in range(k):
+    j = ind % n
+    i = ind // n 
+    file=  success[ind]
+
+    run = file.split("-")[0][5:]
+
+    data = pd.to_numeric(pd.read_csv("{}".format(file)).iloc[:,0])
+    
+    run_n = float(run.split("_")[0])
+    run_f = float(run.split("_")[1])
+    if run_n in len_r:
+        R = len_r[run_n]
+    else:
+        R = len_R(run_n)
+        len_r[run_n] = R
+
+    data = data / R
+    
+
+    axs[i,j].hist(data, color = "green", label = "N = {}".format(len(data)))
+    axs[i,j].legend()
+    axs[i,j].title.set_text("n = {}, f= {}".format(run_n, run_f))
+
+
+plt.savefig("Images/Scaled-RAF_Perturbations_Hist.png")
 
 
 Ns = ast.literal_eval(sys.argv[1])
 ns = ast.literal_eval(sys.argv[2])
 fs = ast.literal_eval(sys.argv[3])
-
 
 
 pool = multiprocess.Pool(processes=int(os.getenv('SLURM_CPUS_ON_NODE')))
@@ -292,8 +349,4 @@ if __name__ == '__main__':
         for i in range(len(Ns)):
             vals = vals + [(Ns[i],fs[i],ns[i])]
             
-        p.starmap(stability_test, vals)
-            
-    
-
-        
+        p.starmap(comp, vals)
